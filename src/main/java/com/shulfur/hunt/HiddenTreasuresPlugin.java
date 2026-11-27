@@ -7,7 +7,6 @@ import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -24,6 +23,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -32,8 +32,9 @@ public final class HiddenTreasuresPlugin extends JavaPlugin implements CommandEx
     public static final String PERM_ADMIN = "shulfur.hunt.admin";
 
     private static final MiniMessage MM = MiniMessage.miniMessage();
+    private static final Random RANDOM = new Random();
     private static final List<String> COMMANDS = List.of(
-            "huntset", "huntclue", "huntstart", "huntstop", "huntstatus", "huntreset", "huntnether");
+            "huntset", "huntclue", "huntstart", "huntstop", "huntstatus", "huntreset", "huntnether", "huntauto");
 
     private TreasureManager treasures;
 
@@ -79,6 +80,7 @@ public final class HiddenTreasuresPlugin extends JavaPlugin implements CommandEx
             case "huntstatus" -> handleStatus(sender);
             case "huntreset" -> handleReset(sender, args);
             case "huntnether" -> handleNether(sender, args);
+            case "huntauto" -> handleAuto(sender, args);
             default -> false;
         };
     }
@@ -133,6 +135,48 @@ public final class HiddenTreasuresPlugin extends JavaPlugin implements CommandEx
         }
         treasures.place(id, target, clue);
         send(sender, "set-success", idTag(id));
+        return true;
+    }
+
+    private boolean handleAuto(CommandSender sender, String[] args) {
+        if (treasures.isRunning()) {
+            send(sender, "set-running");
+            return true;
+        }
+        if (args.length < 2) {
+            send(sender, "usage-auto");
+            return true;
+        }
+
+        int min;
+        int max;
+        try {
+            min = Integer.parseInt(args[0]);
+            max = Integer.parseInt(args[1]);
+        } catch (NumberFormatException ex) {
+            send(sender, "usage-auto");
+            return true;
+        }
+        if (min < 100 || max <= min || max > 5000) {
+            send(sender, "auto-range-invalid");
+            return true;
+        }
+
+        // Clear any existing setup so the new placement is clean.
+        for (int id = 1; id <= TreasureManager.TOTAL; id++) {
+            treasures.remove(id);
+        }
+
+        Location center = Bukkit.getWorlds().get(0).getSpawnLocation();
+        int placed = AutoPlacer.place(center, min, max, treasures, RANDOM);
+
+        if (placed < TreasureManager.TOTAL) {
+            send(sender, "auto-partial", Placeholder.unparsed("placed", String.valueOf(placed)));
+            return true;
+        }
+        send(sender, "auto-done",
+                Placeholder.unparsed("min", String.valueOf(min)),
+                Placeholder.unparsed("max", String.valueOf(max)));
         return true;
     }
 
