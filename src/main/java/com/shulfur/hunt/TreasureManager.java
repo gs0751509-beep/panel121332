@@ -171,6 +171,15 @@ public final class TreasureManager {
         return ids;
     }
 
+    /** Claimed treasures, ordered by id. */
+    public List<Treasure> claimed() {
+        List<Treasure> list = new ArrayList<>();
+        for (Treasure t : treasures.values()) {
+            if (t.collected) list.add(t);
+        }
+        return list;
+    }
+
     /** Lowest-numbered treasure not yet claimed, or null if none remain. */
     public Treasure nextClue() {
         for (Treasure t : treasures.values()) {

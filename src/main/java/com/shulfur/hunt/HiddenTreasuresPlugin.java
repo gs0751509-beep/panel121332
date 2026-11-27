@@ -5,6 +5,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Sound;
@@ -20,6 +21,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.DoubleChestInventory;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -236,6 +238,15 @@ public final class HiddenTreasuresPlugin extends JavaPlugin implements CommandEx
             send(sender, "status-admin",
                     Placeholder.unparsed("missing", ids(treasures.missingIds())),
                     Placeholder.unparsed("remaining", ids(treasures.uncollectedIds())));
+
+            List<TreasureManager.Treasure> claimed = treasures.claimed();
+            if (!claimed.isEmpty()) {
+                send(sender, "status-claimed-header");
+                for (TreasureManager.Treasure t : claimed) {
+                    send(sender, "status-claimed-line", idTag(t.id()),
+                            Placeholder.unparsed("name", t.collectedBy() == null ? "unknown" : t.collectedBy()));
+                }
+            }
         }
         return true;
     }
@@ -275,6 +286,7 @@ public final class HiddenTreasuresPlugin extends JavaPlugin implements CommandEx
         int found = treasures.collectedCount();
         broadcast("claim-broadcast", false, progress(),
                 Placeholder.unparsed("player", player.getName()));
+        showClaimTitle(player);
 
         if (found == TreasureManager.TOTAL) {
             broadcast("complete", true);
@@ -289,6 +301,16 @@ public final class HiddenTreasuresPlugin extends JavaPlugin implements CommandEx
             broadcast("milestone", true, progress());
         }
         announceNextClue();
+    }
+
+    private void showClaimTitle(Player finder) {
+        Title title = Title.title(
+                build("title-main", false),
+                build("title-sub", false, Placeholder.unparsed("player", finder.getName()), progress()),
+                Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(3), Duration.ofMillis(700)));
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            p.showTitle(title);
+        }
     }
 
     public void openNether(CommandSender sender) {
