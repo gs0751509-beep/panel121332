@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.shulfur"
-version = "1.4.0"
+version = "1.5.1"
 
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(25))
@@ -15,7 +15,6 @@ repositories {
 }
 
 dependencies {
-    // Pin an exact build for production, e.g. "26.3.build.<number>", once you've picked one.
     compileOnly("io.papermc.paper:paper-api:26.3.build.+")
 }
 
