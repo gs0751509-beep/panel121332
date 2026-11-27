@@ -1,7 +1,6 @@
 package com.shulfur.hunt;
 
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.Chest;
@@ -67,6 +66,7 @@ public final class TreasureManager {
     private final Map<Pos, Treasure> byPos = new HashMap<>();
     private boolean running;
     private boolean netherOpen;
+    private boolean firstFinderRewarded;
 
     public TreasureManager(HiddenTreasuresPlugin plugin) {
         this.plugin = plugin;
@@ -82,6 +82,7 @@ public final class TreasureManager {
         YamlConfiguration yml = YamlConfiguration.loadConfiguration(file);
         running = yml.getBoolean("running", false);
         netherOpen = yml.getBoolean("nether-open", false);
+        firstFinderRewarded = yml.getBoolean("first-finder-rewarded", false);
         treasures.clear();
         byPos.clear();
 
@@ -112,6 +113,7 @@ public final class TreasureManager {
         YamlConfiguration yml = new YamlConfiguration();
         yml.set("running", running);
         yml.set("nether-open", netherOpen);
+        yml.set("first-finder-rewarded", firstFinderRewarded);
         for (Treasure t : treasures.values()) {
             String base = "treasures." + t.id + ".";
             yml.set(base + "world", t.pos.world());
@@ -202,6 +204,13 @@ public final class TreasureManager {
         save();
     }
 
+    public boolean isFirstFinderRewarded() { return firstFinderRewarded; }
+
+    public void setFirstFinderRewarded(boolean value) {
+        firstFinderRewarded = value;
+        save();
+    }
+
     // ------------------------------------------------------------------
     // Mutations
     // ------------------------------------------------------------------
@@ -210,12 +219,12 @@ public final class TreasureManager {
         Treasure old = treasures.remove(id);
         if (old != null) {
             byPos.remove(old.pos);
-            empty(old.block());
+            clearChest(old.block());
         }
         Treasure t = new Treasure(id, Pos.of(block), clue, false, null);
         treasures.put(id, t);
         byPos.put(t.pos, t);
-        fill(block);
+        fillChest(block);
         save();
     }
 
@@ -223,37 +232,26 @@ public final class TreasureManager {
         Treasure old = treasures.remove(id);
         if (old == null) return;
         byPos.remove(old.pos);
-        empty(old.block());
+        clearChest(old.block());
         save();
     }
 
-    /** Marks the treasure as claimed, empties the chest, and returns everything that was inside. */
-    public List<ItemStack> claim(Treasure t, Block block, String playerName) {
+    /** Marks the treasure as claimed by this player name. Chest contents are left for the player to take. */
+    public void markClaimed(Treasure t, String playerName) {
         t.collected = true;
         t.collectedBy = playerName;
-
-        List<ItemStack> rewards = new ArrayList<>();
-        if (block != null && block.getState() instanceof Chest chest) {
-            Inventory inv = chest.getBlockInventory();
-            for (ItemStack item : inv.getContents()) {
-                if (item != null && !item.getType().isAir()) {
-                    rewards.add(item.clone());
-                }
-            }
-            inv.clear();
-        }
         save();
-        return rewards;
     }
 
     public void reset() {
         for (Treasure t : treasures.values()) {
             t.collected = false;
             t.collectedBy = null;
-            fill(t.block());
+            fillChest(t.block());
         }
         running = false;
         netherOpen = false;
+        firstFinderRewarded = false;
         save();
     }
 
@@ -261,25 +259,13 @@ public final class TreasureManager {
     // Chest helpers
     // ------------------------------------------------------------------
 
-    /** Fills a chest with the Core, a guaranteed Netherite Upgrade, one random trim, and rolled loot. */
-    private void fill(Block block) {
+    private void fillChest(Block block) {
         if (block != null && block.getState() instanceof Chest chest) {
-            Inventory inv = chest.getBlockInventory();
-            inv.clear();
-            inv.addItem(TreasureItems.createCore(plugin.getConfig()));
-            inv.addItem(TreasureItems.createNetheriteUpgrade());
-
-            ItemStack trim = TreasureItems.rollTrim(plugin.getConfig(), RANDOM);
-            if (trim != null) {
-                inv.addItem(trim);
-            }
-            for (ItemStack loot : TreasureItems.rollLoot(plugin.getConfig(), RANDOM)) {
-                inv.addItem(loot);
-            }
+            TreasureItems.fillChest(chest.getBlockInventory(), plugin.getConfig(), RANDOM);
         }
     }
 
-    private static void empty(Block block) {
+    private static void clearChest(Block block) {
         if (block != null && block.getState() instanceof Chest chest) {
             chest.getBlockInventory().clear();
         }
